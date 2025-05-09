@@ -63,6 +63,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 import com.google.firebase.auth.FirebaseAuth
@@ -84,7 +87,16 @@ class RegistrationActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFFFFFFFF)
                 ){
-                    RegistrationScreen()
+                    val navController = rememberNavController()
+
+                    NavHost(navController = navController, startDestination = "register") {
+                        composable("register") {
+                            RegistrationScreen(navController = navController)
+                        }
+                        composable("login") {
+                            LoginScreen(navController = navController)
+                        }
+                    }
                 }
             }
         }
@@ -100,9 +112,77 @@ fun showDatePicker(context: Context, onDateSelected: (Date) -> Unit) {
         onDateSelected(selectedDate.time)
     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
 }
+@Composable
+fun ProfilePicturePicker(
+    profileUri: Uri?,
+    onImageSelected: (Uri) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Gallery picker
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
+        if (it != null) onImageSelected(it)
+    }
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {
+        if (it) cameraImageUri?.let(onImageSelected)
+    }
+
+    fun launchCamera() {
+        val imageFile = File(
+            context.getExternalFilesDir(null),
+            "profile_${System.currentTimeMillis()}.jpg"
+        )
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            imageFile
+        )
+        cameraImageUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (profileUri != null) {
+            Image(
+                painter = rememberAsyncImagePainter(profileUri),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.Gray, CircleShape)
+            )
+        } else {
+            Icon(
+                Icons.Default.Person,
+                contentDescription = "Default Avatar",
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.Gray, CircleShape)
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { galleryLauncher.launch("image/*") }) {
+                Text("Gallery")
+            }
+            Button(onClick = { launchCamera() }) {
+                Text("Camera")
+            }
+        }
+    }
+}
+
 
 @Composable
 fun DoctorRegistrationScreen(
+    navController: NavController,
     viewModel: DoctorViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
@@ -122,8 +202,21 @@ fun DoctorRegistrationScreen(
     var state by remember{ mutableStateOf("") }
     var startTime by remember { mutableStateOf("") }
     var endTime by remember { mutableStateOf("") }
+    var profileImageUri by remember { mutableStateOf<Uri?>(null) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+
+
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)
+        .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Doctor Registration", style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(15.dp))
+        ProfilePicturePicker(profileUri = profileImageUri) {
+            profileImageUri = it
+        }
 
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
         Spacer(Modifier.height(8.dp))
@@ -131,11 +224,11 @@ fun DoctorRegistrationScreen(
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(value = experience, onValueChange = { experience = it }, label = { Text("Experience (years)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("AddressLine ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("AddressLine ") })
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
         Spacer(Modifier.height(8.dp))
 
         // Date Picker (multiple date support)
@@ -198,8 +291,12 @@ fun DoctorRegistrationScreen(
                                 email =email,
                                 address= addressline,
                                 city= city,
-                                state= state
+                                state= state,
+                                profile= profileImageUri
                             )
+                            navController.navigate("login"){
+                                popUpTo("register"){inclusive=true}
+                            }
                             Toast.makeText(context, "Doctor Registered", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
@@ -216,8 +313,10 @@ fun DoctorRegistrationScreen(
 }
 @Composable
 fun PatientRegistrationScreen(
+    navController: NavController,
     viewModel: PatientViewModel = viewModel()
 ) {
+
     val context = LocalContext.current
 
     var name by remember { mutableStateOf("") }
@@ -231,6 +330,8 @@ fun PatientRegistrationScreen(
     var addressline by remember{ mutableStateOf("") }
     var city by remember{ mutableStateOf("") }
     var state by remember{ mutableStateOf("") }
+    var profileImageUri by remember { mutableStateOf<Uri?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -239,7 +340,10 @@ fun PatientRegistrationScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Patient Registration", style = MaterialTheme.typography.headlineSmall)
-
+        Spacer(modifier = Modifier.height(15.dp))
+        ProfilePicturePicker(profileUri = profileImageUri) {
+            profileImageUri = it
+        }
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
 
         OutlinedTextField(
@@ -259,11 +363,11 @@ fun PatientRegistrationScreen(
             label = { Text("Health Conditions") },
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("Address Line") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("Address Line") })
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
         Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
@@ -277,7 +381,7 @@ fun PatientRegistrationScreen(
         Spacer(Modifier.height(8.dp))
 
         Button(onClick = {
-            if(email.isNotEmpty() && password.isNotEmpty()){
+            if(email.isNotEmpty() && password.isNotEmpty() && name.isNotEmpty()){
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(email,password)
                     .addOnCompleteListener { task ->
                         if(task.isSuccessful){
@@ -289,8 +393,12 @@ fun PatientRegistrationScreen(
                                 email = email,
                                 address =addressline,
                                 city= city,
-                                state= state
+                                state= state,
+                                profile= profileImageUri
                             )
+                            navController.navigate("login"){
+                                popUpTo("register"){inclusive=true}
+                            }
                             Toast.makeText(context, "Patient Registered", Toast.LENGTH_SHORT).show()
                         }
                         else {
@@ -298,7 +406,7 @@ fun PatientRegistrationScreen(
                         }
                     }
             } else {
-                Toast.makeText(context, "Email and Password required", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
             }
 
         }) {
@@ -316,6 +424,7 @@ fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
                 OutlinedButton(
                     onClick = { onGenderSelected(gender) },
                     colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if(gender== selectedGender) Color.White else MaterialTheme.colorScheme.primary,
                         containerColor = if (gender == selectedGender) MaterialTheme.colorScheme.primary else Color.Transparent
                     )
                 ) {
@@ -327,7 +436,7 @@ fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
 }
 
 @Composable
-fun RegistrationScreen(){
+fun RegistrationScreen(navController: NavController){
     var selectedRole by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -345,8 +454,7 @@ fun RegistrationScreen(){
                 onClick = { selectedRole = "Doctor" },
                 colors = ButtonDefaults.buttonColors(
                     contentColor = Color.White,
-                    containerColor = if (selectedRole == "Doctor") Color(
-                        0xFF99FF71) else Color(0xFF5FC6FF)
+                    containerColor = if (selectedRole == "Doctor") Color(0xFF629457) else Color(0xFF1779A8)
 
                 )
             ) {
@@ -356,8 +464,7 @@ fun RegistrationScreen(){
             Button(
                 onClick = { selectedRole = "Patient" },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedRole == "Patient")  Color(
-                        0xFF99FF71) else Color(0xFF5FC6FF)
+                    containerColor = if (selectedRole == "Patient")  Color(0xFF629457) else Color(0xFF1779A8)
                 )
             ) {
                 Text("Patient")
@@ -368,15 +475,15 @@ fun RegistrationScreen(){
 
         // Conditional display of registration forms
         when (selectedRole) {
-            "Doctor" -> DoctorRegistrationScreen()
-            "Patient" -> PatientRegistrationScreen()
+            "Doctor" -> DoctorRegistrationScreen(navController = navController)
+            "Patient" -> PatientRegistrationScreen(navController = navController)
         }
     }}
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview6() {
-    DoctorAppointmentTheme {
-        RegistrationScreen()
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview6() {
+//    DoctorAppointmentTheme {
+//        RegistrationScreen()
+//    }
+//}

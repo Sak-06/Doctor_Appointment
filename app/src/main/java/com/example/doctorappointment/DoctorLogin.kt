@@ -31,6 +31,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -41,11 +43,12 @@ class DoctorLogin : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DoctorAppointmentTheme {
+                val navController = rememberNavController()
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFFFFFFFF)
                 ) {
-                    DoctorLoginScreen()
+                    DoctorLoginScreen(navController)
                 }
             }
         }
@@ -53,7 +56,7 @@ class DoctorLogin : ComponentActivity() {
 }
 
 @Composable
-fun DoctorLoginScreen(){
+fun DoctorLoginScreen(navController: NavController){
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
@@ -93,7 +96,9 @@ fun DoctorLoginScreen(){
                         db.collection("users").document(uid).get()
                             .addOnSuccessListener { doc ->
                                 if(doc.getString("role")=="doctor"){
-                                    context.startActivity(Intent(context, PatientDashboard::class.java))
+                                    navController.navigate("doctor_home") {
+                                        popUpTo("login") { inclusive = true } // So back doesn't return to login
+                                    }
                                 }
                                 else{
                                     auth.signOut()
@@ -101,6 +106,8 @@ fun DoctorLoginScreen(){
                                 }
                                 loading=false
                             }
+
+
                     }
                     .addOnFailureListener {
                         Toast.makeText(context, " Login failed: ${it.message}", Toast.LENGTH_SHORT).show()
@@ -122,10 +129,10 @@ fun DoctorLoginScreen(){
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview3() {
-    DoctorAppointmentTheme {
-        DoctorLoginScreen()
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview3() {
+//    DoctorAppointmentTheme {
+//        DoctorLoginScreen()
+//    }
+//}

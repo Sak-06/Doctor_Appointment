@@ -31,6 +31,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -41,11 +43,12 @@ class PatientLogin : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DoctorAppointmentTheme {
+                val navController = rememberNavController()
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFFFFFFFF)
                 ) {
-                    PatientLoginScreen()
+                    PatientLoginScreen(navController)
                 }
             }
         }
@@ -53,7 +56,7 @@ class PatientLogin : ComponentActivity() {
 }
 
 @Composable
-fun PatientLoginScreen(){
+fun PatientLoginScreen(navController: NavController){
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
@@ -100,12 +103,17 @@ fun PatientLoginScreen(){
                                     Toast.makeText(context, "Access Denied : Not a patient", Toast.LENGTH_LONG).show()
                                 }
                                 loading=false
+                                navController.navigate("patient_home") {
+                                    popUpTo("login") { inclusive = true }
+                                }
                             }
                     }
                     .addOnFailureListener {
                         Toast.makeText(context, " Login failed: ${it.message}", Toast.LENGTH_LONG).show()
                         loading=false
                     }
+
+
             },
             modifier = Modifier.fillMaxWidth()
                 .padding(15.dp)
@@ -122,10 +130,10 @@ fun PatientLoginScreen(){
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview2() {
-    DoctorAppointmentTheme {
-        PatientLoginScreen()
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview2() {
+//    DoctorAppointmentTheme {
+//        PatientLoginScreen()
+//    }
+//}

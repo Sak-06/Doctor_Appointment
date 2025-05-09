@@ -1,5 +1,6 @@
 package com.example.doctorappointment
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -14,7 +15,8 @@ class DoctorViewModel  : ViewModel() {
         specialty: String,
         experience: Int,
         availability: Map<String, List<Pair<String, String>>>,
-        email: String ,
+        email: String,
+        profile: Uri?,
         address: String,
         city : String,
         state : String
@@ -23,12 +25,13 @@ class DoctorViewModel  : ViewModel() {
         val docAvailability = availability.mapValues { entry ->
             entry.value.map { TimeSlot(it.first, it.second) }
         }
+        val profileUrl =profile?.toString()?:""
 
         val doctor = DoctorDta(
             name = name,
             specialty = specialty,
             experience = experience,
-            photoUrl = "", // add upload logic
+            profileUri = profileUrl,
             availability = docAvailability,
             email = email,
             address = address,

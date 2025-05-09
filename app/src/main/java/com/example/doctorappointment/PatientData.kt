@@ -9,6 +9,6 @@ data class Patient(
     val email: String ="",
     val state: String="",
     val healthConditions: String = "",
-    val photoUrl: String = ""
+    val profileUri: String = ""
 )
 
