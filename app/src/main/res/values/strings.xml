@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Doctor Appointment</string>
+    <string name="title_activity_patein_login">PateinLogin</string>
+    <string name="title_activity_doctor_login">DoctorLogin</string>
+    <string name="title_activity_patient_dashboard">PatientDashboard</string>
+    <string name="title_activity_doctor_dashboard">DoctorDashboard</string>
+    <string name="title_activity_registration">RegistrationActivity</string>
+</resources>
