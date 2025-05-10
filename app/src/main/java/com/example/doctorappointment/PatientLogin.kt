@@ -64,6 +64,9 @@ fun PatientLoginScreen(navController: NavController){
     var email by remember{ mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
+    if (auth.currentUser != null) {
+        navController.navigate("patient_home") // This will navigate to the home screen after login
+    }
     Column(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -97,18 +100,14 @@ fun PatientLoginScreen(navController: NavController){
                 auth.signInWithEmailAndPassword(email.trim(), password)
                     .addOnSuccessListener {
                         val uid = auth.currentUser!!.uid
-                        db.collection("users").document(uid).get()
-                            .addOnSuccessListener { doc ->
-                                if (doc.getString("role") == "patient") {
-                                    context.startActivity(Intent(context, PatientDashboard::class.java))
+                        db.collection("patients").document(uid).get()
+                            .addOnSuccessListener {
+
                                     navController.navigate("patient_home") {
                                         popUpTo("login") { inclusive = true }
                                     }
-                                } else {
-                                    auth.signOut()
-                                    Toast.makeText(context, "Access Denied: Not a patient", Toast.LENGTH_LONG).show()
-                                }
                                 loading = false
+
                             }
                             .addOnFailureListener {
                                 Toast.makeText(context, "Error fetching user role", Toast.LENGTH_LONG).show()

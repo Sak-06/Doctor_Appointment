@@ -93,7 +93,7 @@ fun DoctorLoginScreen(navController: NavController){
                 auth.signInWithEmailAndPassword(email, password)
                     .addOnSuccessListener {
                         val uid = auth.currentUser!!.uid
-                        db.collection("users").document(uid).get()
+                        db.collection("doctors").document(uid).get()
                             .addOnSuccessListener { doc ->
                                 if(doc.getString("role")=="doctor"){
                                     navController.navigate("doctor_home") {

@@ -9,9 +9,12 @@ import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun AppNavGraph(navController: NavHostController){
-    NavHost(navController= navController, startDestination = if (FirebaseAuth.getInstance().currentUser != null) "patient_home" else "login"){
+    NavHost(
+        navController= navController,
+        startDestination = if (FirebaseAuth.getInstance().currentUser != null) "patient_home" else "login"
+    )
+    {
         composable("login"){ LoginScreen(navController) }
-
         composable("patient_login") { PatientLoginScreen(navController) }
         composable("doctor_login") { DoctorLoginScreen(navController) }
         composable("register") { RegistrationScreen(navController) }

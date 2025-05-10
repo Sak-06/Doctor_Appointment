@@ -28,6 +28,7 @@ class DoctorViewModel  : ViewModel() {
         val profileUrl =profile?.toString()?:""
 
         val doctor = DoctorDta(
+            role = "doctor",
             name = name,
             specialty = specialty,
             experience = experience,

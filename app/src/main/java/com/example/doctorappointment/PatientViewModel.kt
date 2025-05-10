@@ -27,6 +27,7 @@ class PatientViewModel : ViewModel() {
         val patientid = auth.currentUser?.uid ?: return
         val profileUrl = profile?.toString()?:""
         val patient = Patient(
+            role = "patient",
             name = name,
             age = age,
             gender = gender,
