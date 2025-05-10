@@ -6,18 +6,14 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -40,11 +35,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,29 +49,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.shouldShowRationale
 
-class RegistrationActivity : ComponentActivity() {
+
+
+class RegistrationActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -86,7 +85,7 @@ class RegistrationActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFFFFFFFF)
-                ){
+                ) {
                     val navController = rememberNavController()
 
                     NavHost(navController = navController, startDestination = "register") {
@@ -102,7 +101,35 @@ class RegistrationActivity : ComponentActivity() {
         }
     }
 }
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun CameraPermissionRequest(onPermissionGranted: () -> Unit) {
+    val context = LocalContext.current
+    val permissionState = rememberPermissionState(permission = android.Manifest.permission.CAMERA)
 
+    LaunchedEffect(Unit) {
+        permissionState.launchPermissionRequest()
+    }
+
+//    when {
+//        permissionState.hasPermission -> {
+//            onPermissionGranted()
+//        }
+//
+//        permissionState.shouldShowRationale -> {
+//            // Optional: Show UI explaining why camera is needed
+//            Text("Camera permission is needed to upload a profile picture.")
+//        }
+//
+//        !permissionState.permissionRequested -> {
+//            // Initial state, waiting for request
+//        }
+//
+//        else -> {
+//            Text("Camera permission denied. Please enable it in settings.")
+//        }
+//    }
+}
 
 fun showDatePicker(context: Context, onDateSelected: (Date) -> Unit) {
     val calendar = Calendar.getInstance()
@@ -112,6 +139,7 @@ fun showDatePicker(context: Context, onDateSelected: (Date) -> Unit) {
         onDateSelected(selectedDate.time)
     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
 }
+
 @Composable
 fun ProfilePicturePicker(
     profileUri: Uri?,
@@ -120,6 +148,7 @@ fun ProfilePicturePicker(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    CameraPermissionRequest {  }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
 
     // Gallery picker
@@ -179,123 +208,150 @@ fun ProfilePicturePicker(
     }
 }
 
+fun showTimePicker(context: Context, onTimeSelected: (String) -> Unit) {
+    val cal = Calendar.getInstance()
+    TimePickerDialog(
+        context,
+        { _, hour, minute ->
+            val amPm = if (hour < 12) "AM" else "PM"
+            val formattedHour = if (hour % 12 == 0) 12 else hour % 12
+            onTimeSelected(String.format("%02d:%02d %s", formattedHour, minute, amPm))
+        },
+        cal.get(Calendar.HOUR_OF_DAY),
+        cal.get(Calendar.MINUTE),
+        false
+    ).show()
+}
 
 @Composable
 fun DoctorRegistrationScreen(
     navController: NavController,
     viewModel: DoctorViewModel = viewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
     val context = LocalContext.current
     val dateFormatter = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     var name by remember { mutableStateOf("") }
     var specialty by remember { mutableStateOf("") }
     var experience by remember { mutableStateOf("") }
-    var selectedDates by remember { mutableStateOf<List<Date>>(emptyList()) }
-    var availability by remember { mutableStateOf<MutableMap<String, MutableList<Pair<String, String>>>>(mutableMapOf()) }
 
-    var addressline by remember{ mutableStateOf("") }
-    var city by remember{ mutableStateOf("") }
-    var state by remember{ mutableStateOf("") }
+    var addressline by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf("") }
+
     var startTime by remember { mutableStateOf("") }
     var endTime by remember { mutableStateOf("") }
+    var date by remember{ mutableStateOf("") }
+    var availabilityMap by remember { mutableStateOf(mutableMapOf<String, MutableList<Pair<String, String>>>()) }
     var profileImageUri by remember { mutableStateOf<Uri?>(null) }
 
-
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)
-        .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Doctor Registration", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(15.dp))
         ProfilePicturePicker(profileUri = profileImageUri) {
             profileImageUri = it
         }
 
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-        Spacer(Modifier.height(8.dp))
         OutlinedTextField(value = specialty, onValueChange = { specialty = it }, label = { Text("Specialty") })
-        Spacer(Modifier.height(8.dp))
         OutlinedTextField(value = experience, onValueChange = { experience = it }, label = { Text("Experience (years)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("AddressLine ") })
-        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("Address Line") })
         OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
-        Spacer(Modifier.height(8.dp))
         OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
-        Spacer(Modifier.height(8.dp))
 
-        // Date Picker (multiple date support)
         Button(onClick = {
-            showDatePicker(context) { selectedDate ->
-                selectedDates = selectedDates + selectedDate
+            val datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("Select Date").build()
+            datePicker.show((context as AppCompatActivity).supportFragmentManager, "datePicker")
+            datePicker.addOnPositiveButtonClickListener { millis ->
+                val selectedDate = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(millis)
+                date = selectedDate
             }
         }) {
             Text("Pick Available Dates")
         }
-
-        selectedDates.forEach { date ->
-            val dateStr = dateFormatter.format(date)
-            Text(text = "Date: $dateStr", fontWeight = FontWeight.Bold)
-            val slots = availability[dateStr] ?: emptyList()
-            slots.forEach { slot ->
-                Text("Slot: ${slot.first} - ${slot.second}")
-            }
-
+        if(date.isNotEmpty()){
+            Text("Selected Date: $date")
+        }
             Row {
-                TextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Start Time") }, modifier = Modifier.weight(1f))
+                Button(onClick = {
+                    showTimePicker(context) { time -> startTime = time }
+                }, modifier = Modifier.weight(1f)) {
+                    Text(if (startTime.isEmpty()) "Start Time" else startTime)
+                }
+
                 Spacer(Modifier.width(8.dp))
-                TextField(value = endTime, onValueChange = { endTime = it }, label = { Text("End Time") }, modifier = Modifier.weight(1f))
+
+                Button(onClick = {
+                    showTimePicker(context) { time -> endTime = time }
+                }, modifier = Modifier.weight(1f)) {
+                    Text(if (endTime.isEmpty()) "End Time" else endTime)
+                }
             }
+
             Button(onClick = {
-                if (startTime.isNotEmpty() && endTime.isNotEmpty()) {
-                    val updatedSlots = availability.getOrDefault(dateStr, mutableListOf())
-                    updatedSlots.add(startTime to endTime)
-                    availability[dateStr] = updatedSlots
+                if (startTime.isNotEmpty() && endTime.isNotEmpty() && date.isNotEmpty()) {
+                    val updatedSlots = availabilityMap[date]?.toMutableList()?: mutableListOf()
+                    updatedSlots.add(Pair(startTime, endTime))
+                    availabilityMap[date] = updatedSlots
                     startTime = ""
                     endTime = ""
                 }
             }) {
                 Text("Add Time Slot")
             }
+        if (availabilityMap.containsKey(date)) {
+            Text("Available Slots for $date:")
+            availabilityMap[date]?.forEach { slot ->
+                Text("Slot: ${slot.first} - ${slot.second}")
+            }
+        }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
 
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
-        Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation()
         )
-        Spacer(Modifier.height(8.dp))
 
         Button(onClick = {
-            if(email.isNotEmpty() && password.isNotEmpty()){
-                FirebaseAuth.getInstance().createUserWithEmailAndPassword(email,password)
-                    .addOnCompleteListener { task->
-                        if(task.isSuccessful){
+            if (email.isNotEmpty() && password.isNotEmpty()) {
+                FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, password)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            // Transform availability map to Firestore-friendly format
+                            val availabilityFirebase = availabilityMap.mapValues { entry ->
+                                entry.value.map { slot ->
+                                    mapOf("startTime" to slot.first, "endTime" to slot.second)
+                                }
+                            }
+
                             viewModel.registerDoctor(
                                 name = name,
                                 specialty = specialty,
                                 experience = experience.toIntOrNull() ?: 0,
-                                availability = availability,
-                                email =email,
-                                address= addressline,
-                                city= city,
-                                state= state,
-                                profile= profileImageUri
+                                availability = availabilityFirebase,
+                                email = email,
+                                address = addressline,
+                                city = city,
+                                state = state,
+                                profile = profileImageUri
                             )
-                            navController.navigate("login"){
-                                popUpTo("register"){inclusive=true}
+
+                            navController.navigate("login") {
+                                popUpTo("register") { inclusive = true }
                             }
                             Toast.makeText(context, "Doctor Registered", Toast.LENGTH_SHORT).show()
                         } else {
@@ -305,18 +361,17 @@ fun DoctorRegistrationScreen(
             } else {
                 Toast.makeText(context, "Email and Password required", Toast.LENGTH_SHORT).show()
             }
-
         }) {
             Text("Register Doctor")
         }
     }
-}
+
+
 @Composable
 fun PatientRegistrationScreen(
     navController: NavController,
     viewModel: PatientViewModel = viewModel()
 ) {
-
     val context = LocalContext.current
 
     var name by remember { mutableStateOf("") }
@@ -327,9 +382,9 @@ fun PatientRegistrationScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    var addressline by remember{ mutableStateOf("") }
-    var city by remember{ mutableStateOf("") }
-    var state by remember{ mutableStateOf("") }
+    var addressline by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf("") }
     var profileImageUri by remember { mutableStateOf<Uri?>(null) }
 
     Column(
@@ -337,7 +392,8 @@ fun PatientRegistrationScreen(
             .fillMaxSize()
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Patient Registration", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(15.dp))
@@ -381,39 +437,38 @@ fun PatientRegistrationScreen(
         Spacer(Modifier.height(8.dp))
 
         Button(onClick = {
-            if(email.isNotEmpty() && password.isNotEmpty() && name.isNotEmpty()){
-                FirebaseAuth.getInstance().createUserWithEmailAndPassword(email,password)
+            if (email.isNotEmpty() && password.isNotEmpty() && name.isNotEmpty()) {
+                FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener { task ->
-                        if(task.isSuccessful){
+                        if (task.isSuccessful) {
                             viewModel.registerPatient(
                                 name = name,
                                 age = age.toIntOrNull() ?: 0,
                                 gender = gender,
                                 healthConditions = healthConditions,
                                 email = email,
-                                address =addressline,
-                                city= city,
-                                state= state,
-                                profile= profileImageUri
+                                address = addressline,
+                                city = city,
+                                state = state,
+                                profile = profileImageUri
                             )
-                            navController.navigate("login"){
-                                popUpTo("register"){inclusive=true}
+                            navController.navigate("login") {
+                                popUpTo("register") { inclusive = true }
                             }
                             Toast.makeText(context, "Patient Registered", Toast.LENGTH_SHORT).show()
-                        }
-                        else {
+                        } else {
                             Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                         }
                     }
             } else {
                 Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
             }
-
         }) {
             Text("Register Patient")
         }
     }
 }
+
 @Composable
 fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
     val genders = listOf("Male", "Female", "Other")
@@ -424,7 +479,7 @@ fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
                 OutlinedButton(
                     onClick = { onGenderSelected(gender) },
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if(gender== selectedGender) Color.White else MaterialTheme.colorScheme.primary,
+                        contentColor = if (gender == selectedGender) Color.White else MaterialTheme.colorScheme.primary,
                         containerColor = if (gender == selectedGender) MaterialTheme.colorScheme.primary else Color.Transparent
                     )
                 ) {
@@ -436,14 +491,13 @@ fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
 }
 
 @Composable
-fun RegistrationScreen(navController: NavController){
+fun RegistrationScreen(navController: NavController) {
     var selectedRole by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
-            ,
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -464,7 +518,7 @@ fun RegistrationScreen(navController: NavController){
             Button(
                 onClick = { selectedRole = "Patient" },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedRole == "Patient")  Color(0xFF629457) else Color(0xFF1779A8)
+                    containerColor = if (selectedRole == "Patient") Color(0xFF629457) else Color(0xFF1779A8)
                 )
             ) {
                 Text("Patient")
@@ -478,12 +532,13 @@ fun RegistrationScreen(navController: NavController){
             "Doctor" -> DoctorRegistrationScreen(navController = navController)
             "Patient" -> PatientRegistrationScreen(navController = navController)
         }
-    }}
+    } 
+}
 
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview6() {
+// @Preview(showBackground = true)
+// @Composable
+// fun GreetingPreview6() {
 //    DoctorAppointmentTheme {
 //        RegistrationScreen()
 //    }
-//}
+// }

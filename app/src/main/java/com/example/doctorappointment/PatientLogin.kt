@@ -1,6 +1,5 @@
 package com.example.doctorappointment
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -56,12 +53,12 @@ class PatientLogin : ComponentActivity() {
 }
 
 @Composable
-fun PatientLoginScreen(navController: NavController){
+fun PatientLoginScreen(navController: NavController) {
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
-    var email by remember{ mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     if (auth.currentUser != null) {
@@ -72,21 +69,22 @@ fun PatientLoginScreen(navController: NavController){
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize()
     ) {
-        Text(" Welcome User ",
+        Text(
+            " Welcome User ",
             modifier = Modifier.padding(20.dp),
             fontSize = 25.sp,
             fontWeight = FontWeight.SemiBold
         )
         OutlinedTextField(
-            value=email,
-            onValueChange = {email=it},
-            label={Text(" Email : ")},
+            value = email,
+            onValueChange = { email = it },
+            label = { Text(" Email : ") },
             modifier = Modifier.fillMaxWidth().padding(20.dp)
         )
         OutlinedTextField(
             value = password,
-            onValueChange = {password=it},
-            label = {Text(" Password : ")},
+            onValueChange = { password = it },
+            label = { Text(" Password : ") },
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             visualTransformation = PasswordVisualTransformation()
         )
@@ -102,12 +100,10 @@ fun PatientLoginScreen(navController: NavController){
                         val uid = auth.currentUser!!.uid
                         db.collection("patients").document(uid).get()
                             .addOnSuccessListener {
-
-                                    navController.navigate("patient_home") {
-                                        popUpTo("login") { inclusive = true }
-                                    }
+                                navController.navigate("patient_home") {
+                                    popUpTo("login") { inclusive = true }
+                                }
                                 loading = false
-
                             }
                             .addOnFailureListener {
                                 Toast.makeText(context, "Error fetching user role", Toast.LENGTH_LONG).show()
@@ -126,20 +122,16 @@ fun PatientLoginScreen(navController: NavController){
             Text("Login")
         }
 
-        if(loading){
-            CircularProgressIndicator(modifier = Modifier.padding( top= 16.dp))
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
         }
-
-
-
-
     }
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview2() {
+// @Preview(showBackground = true)
+// @Composable
+// fun GreetingPreview2() {
 //    DoctorAppointmentTheme {
 //        PatientLoginScreen()
 //    }
-//}
+// }

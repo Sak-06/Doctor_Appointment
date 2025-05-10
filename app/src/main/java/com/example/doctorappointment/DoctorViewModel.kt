@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
-class DoctorViewModel  : ViewModel() {
+class DoctorViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
@@ -14,18 +14,22 @@ class DoctorViewModel  : ViewModel() {
         name: String,
         specialty: String,
         experience: Int,
-        availability: Map<String, List<Pair<String, String>>>,
+        availability: Map<String, List<Map<String, String>>>,
         email: String,
         profile: Uri?,
         address: String,
-        city : String,
-        state : String
+        city: String,
+        state: String
     ) {
         val docid = auth.currentUser?.uid ?: return
         val docAvailability = availability.mapValues { entry ->
-            entry.value.map { TimeSlot(it.first, it.second) }
+            entry.value.map { slotmap ->
+                val start = slotmap["start"] ?: ""
+                val end = slotmap["end"] ?: ""
+                TimeSlot(start, end)
+            }
         }
-        val profileUrl =profile?.toString()?:""
+        val profileUrl = profile?.toString() ?: ""
 
         val doctor = DoctorDta(
             role = "doctor",

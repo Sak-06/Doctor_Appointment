@@ -11,26 +11,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,17 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
+import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
-import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.firestore
 
 class PatientViewDocs : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,8 +47,9 @@ class PatientViewDocs : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DoctorAppointmentTheme {
+                val navController = rememberNavController()
                 Surface() {
-                    AllDoctorsScreen()
+                    AllDoctorsScreen(navController)
                 }
             }
         }
@@ -68,9 +57,8 @@ class PatientViewDocs : ComponentActivity() {
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AllDoctorsScreen(navController: NavController){
+fun AllDoctorsScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
     var doctors by remember { mutableStateOf<List<DoctorDta>>(emptyList()) }
 
@@ -86,8 +74,11 @@ fun AllDoctorsScreen(navController: NavController){
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (doctor.profileUri.isNotEmpty()) {
-                            Image(painter = rememberAsyncImagePainter(doctor.profileUri), contentDescription = null,
-                                modifier = Modifier.size(64.dp))
+                            Image(
+                                painter = rememberAsyncImagePainter(doctor.profileUri),
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp)
+                            )
                         }
                         Column(modifier = Modifier.padding(start = 16.dp)) {
                             Text(doctor.name, fontWeight = FontWeight.Bold)
@@ -115,66 +106,101 @@ fun AllDoctorsScreen(navController: NavController){
 @Composable
 fun BookAppointmentScreen(doctorId: String, navController: NavController) {
     val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
     var doctor by remember { mutableStateOf<DoctorDta?>(null) }
+    var selectedDate by remember { mutableStateOf("") }
+    var selectedTimeSlot by remember { mutableStateOf<TimeSlot?>(null) }
 
     LaunchedEffect(doctorId) {
         db.collection("doctors").document(doctorId).get().addOnSuccessListener { snapshot ->
-            doctor = snapshot.toObject(DoctorDta::class.java)?.copy(id = doctorId)
+            snapshot.toObject(DoctorDta::class.java)?.let {
+                doctor = it.copy(id = doctorId)
+                selectedDate = it.availability.keys.firstOrNull() ?: ""
+            }
         }
     }
 
     doctor?.let { doc ->
-        val availableDates = doc.availability.keys
-        var selectedDate by remember { mutableStateOf(availableDates.firstOrNull()) }
-        val slots = doc.availability[selectedDate] ?: emptyList()
+        val availableDates = doc.availability.keys.toList()
+        val timeSlots = doc.availability[selectedDate] ?: emptyList()
 
         AlertDialog(
             onDismissRequest = { navController.popBackStack() },
             confirmButton = {
-                Button(onClick = {
-                    // Save to Firestore
-                    val appointment = hashMapOf(
-                        "doctorId" to doc.id,
-                        "doctorName" to doc.name,
-                        "patientId" to FirebaseAuth.getInstance().uid,
-                        "appointmentDate" to selectedDate,
-                        "appointmentTime" to slots.firstOrNull()?.get("startTime"),
-                        "timestamp" to FieldValue.serverTimestamp()
-                    )
-                    db.collection("appointments").add(appointment)
-                    scheduleReminder(appointment)
-                    navController.popBackStack()
-                }) {
+                Button(
+                    onClick = {
+                        val patientId = FirebaseAuth.getInstance().currentUser?.uid
+                        val dateTime = getAppointmentTimestamp(selectedDate, selectedTimeSlot?.startTime)
+
+                        if (patientId != null && selectedTimeSlot != null && dateTime != null) {
+                            val appointment = hashMapOf(
+                                "doctorId" to doc.id,
+                                "patientId" to patientId,
+                                "appointmentTime" to dateTime
+                            )
+
+                            db.collection("appointments")
+                                .add(appointment)
+                                .addOnSuccessListener {
+                                    Toast.makeText(context, "Appointment booked!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                }
+                                .addOnFailureListener {
+                                    Toast.makeText(context, "Failed to book: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                        } else {
+                            Toast.makeText(context, "Select a slot first", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
                     Text("Book")
                 }
             },
-            title = { Text("Select Slot") },
+            title = { Text("Book Appointment with ${doc.name}") },
             text = {
                 Column {
-                    DropdownMenu(
-                        expanded = true,
-                        onDismissRequest = { /* ignore */ }
-                    ) {
-                        availableDates.forEach { date ->
-                            DropdownMenuItem(onClick = { selectedDate = date }) {
-                                Text(text = date)
-                            }
+                    Text("Select Date:")
+                    availableDates.forEach { date ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedDate == date,
+                                onClick = { selectedDate = date }
+                            )
+                            Text(date)
                         }
                     }
-                    slots.forEach {
-                        Text("${it["startTime"]} - ${it["endTime"]}")
+
+                    Spacer(modifier = Modifier.padding(8.dp))
+                    Text("Select Time Slot:")
+                    timeSlots.forEach { slot ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTimeSlot == slot,
+                                onClick = { selectedTimeSlot = slot }
+                            )
+                            Text("${slot.startTime} - ${slot.endTime}")
+                        }
                     }
                 }
             }
         )
     }
 }
+fun getAppointmentTimestamp(dateStr: String, timeStr: String?): com.google.firebase.Timestamp? {
+    return try {
+        if (timeStr == null) return null
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        val date = format.parse("$dateStr $timeStr")
+        date?.let { com.google.firebase.Timestamp(it) }
+    } catch (e: Exception) {
+        null
+    }
+}
 
-
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview3() {
+// @Preview(showBackground = true)
+// @Composable
+// fun GreetingPreview3() {
 //    DoctorAppointmentTheme {
 //        Greeting5("Android")
 //    }
-//}
+// }

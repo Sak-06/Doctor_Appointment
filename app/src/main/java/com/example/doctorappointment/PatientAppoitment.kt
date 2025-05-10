@@ -1,6 +1,9 @@
 package com.example.doctorappointment
 
-import android.annotation.SuppressLint
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,8 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -25,80 +28,150 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
-import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class PatientAppoitment : ComponentActivity() {
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DoctorAppointmentTheme {
-                PatientAppointmentsScreen()
-            }
+            PatientAppointmentScreen()
         }
     }
 }
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PatientAppointmentsScreen() {
+fun PatientAppointmentScreen() {
+    val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
-    val uid = FirebaseAuth.getInstance().uid
-    var appointments by remember { mutableStateOf<List<Appointment>>(emptyList()) }
+    val context = LocalContext.current
+    val patientId = auth.currentUser?.uid ?: ""
+    var appointments by remember { mutableStateOf(listOf<AppointmentDisplay>()) }
 
-    LaunchedEffect(uid) {
-        db.collection("appointments").whereEqualTo("patientId", uid).get()
-            .addOnSuccessListener { result ->
-                appointments = result.documents.mapNotNull { it.toObject(Appointment::class.java) }
+    LaunchedEffect(Unit) {
+        db.collection("appointments")
+            .whereEqualTo("patientId", patientId)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val list = mutableListOf<AppointmentDisplay>()
+                for (doc in querySnapshot.documents) {
+                    val doctorId = doc.getString("doctorId") ?: continue
+                    val appointmentTime =
+                        doc.getTimestamp("appointmentTime")?.toDate() ?: continue
+                    val formattedTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(appointmentTime)
+
+                    db.collection("doctors").document(doctorId).get()
+                        .addOnSuccessListener { doctorDoc ->
+                            val doctorName = doctorDoc.getString("name") ?: "Unknown Doctor"
+                            list.add(
+                                AppointmentDisplay(
+                                    doctorName,
+                                    formattedTime,
+                                    doc.id
+                                )
+                            )
+                            appointments = list.toList()
+
+                            // Schedule notification 1 hour before
+                            scheduleAppointmentNotification(
+                                context,
+                                appointmentTime.time - 60 * 60 * 1000,
+                                "You have an appointment with Dr. $doctorName at ${
+                                SimpleDateFormat(
+                                    "hh:mm a, dd MMM",
+                                    Locale.getDefault()
+                                ).format(appointmentTime)
+                                }"
+                            )
+                        }
+                }
             }
     }
 
-    LazyColumn {
-        items(appointments) { appt ->
-            Card(modifier = Modifier.padding(8.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Doctor: ${appt.doctorName}", fontWeight = FontWeight.Bold)
-                    Text("Date: ${appt.appointmentDate}")
-                    Text("Time: ${appt.appointmentTime}")
-                }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("My Appointments") }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            items(appointments.size) { index ->
+                val appt = appointments[index]
+                AppointmentCard(appt)
             }
         }
     }
 }
 
 @Composable
-fun AppointmentItem(appointment: Appointment) {
+fun AppointmentCard(appt: AppointmentDisplay) {
     Card(
-        modifier = Modifier.padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text("Doctor: ${appointment.doctorName}", fontWeight = FontWeight.Bold)
-            Text("Date: ${appointment.appointmentDate}")
-            Text("Schedule: ${appointment.schedule}")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Doctor: ${appt.doctorName}", style = MaterialTheme.typography.titleMedium)
+            Text("Time: ${SimpleDateFormat("hh:mm a, dd MMM yyyy", Locale.getDefault()).format(appt.appointmentTime)}")
         }
     }
 }
-data class Appointment(
+
+data class AppointmentDisplay(
     val doctorName: String,
-    val appointmentDate: String,
-    val schedule: String
+    val appointmentTime: String,
+    val appointmentId: String
 )
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview2() {
+
+fun scheduleAppointmentNotification(context: Context, triggerTimeMillis: Long, message: String) {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        if (!alarmManager.canScheduleExactAlarms()) {
+            return
+        }
+    }
+
+    val intent = Intent(context, AppointmentReminderReceiver::class.java).apply {
+        putExtra("message", message)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        triggerTimeMillis.toInt(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    try {
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            triggerTimeMillis,
+            pendingIntent
+        )
+    } catch (e: SecurityException) {
+        e.printStackTrace()
+    }
+}
+
+// @Preview(showBackground = true)
+// @Composable
+// fun GreetingPreview2() {
 //    DoctorAppointmentTheme {
 //        Greeting4("Android")
 //    }
-//}
+// }

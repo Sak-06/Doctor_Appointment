@@ -1,43 +1,61 @@
 package com.example.doctorappointment
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.input.key.Key.Companion.I
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
-    val items = listOf("home", "appointments", "doctors", "chatbot")
-    val icons = listOf(painterResource( R.drawable.home),
-        painterResource( R.drawable.appointment),
+
+    val icons = listOf(
+        painterResource(R.drawable.home),
+        painterResource(R.drawable.appointment),
         painterResource(R.drawable.doctor),
-        painterResource(R.drawable.chatbot))
-    val labels = listOf("Home", "Appointments", "Doctors", "Chatbot")
+        painterResource(R.drawable.chatbot)
+    )
+    val labels = listOf("Home", "Appointment", "Doctors", "Chatbot")
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
+    val routes = listOf(
+        "patient_home",
+        "patient_appointments",
+        "patient_view_doctors",
+        "chatbot"
+    )
 
     NavigationBar {
-        items.forEachIndexed { index, screen ->
+        routes.forEachIndexed { index, route ->
             NavigationBarItem(
-                icon = { Icon(icons[index], contentDescription = labels[index]) },
+                icon = { Icon(icons[index],
+                    contentDescription = labels[index],
+                    modifier = Modifier.size(30.dp),
+                    tint = Color.Unspecified
+                            )
+                       },
                 label = { Text(labels[index]) },
-                selected = currentRoute == screen,
+                selected = currentRoute == route,
                 onClick = {
-                    if (currentRoute != screen) {
-                        navController.navigate(screen)
+                    if (currentRoute != route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
             )
         }
     }
 }
-
-

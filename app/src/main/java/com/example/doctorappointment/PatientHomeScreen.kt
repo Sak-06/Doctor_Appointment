@@ -5,19 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,7 +36,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,23 +46,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import com.google.android.play.integrity.internal.c
-import com.google.android.play.integrity.internal.n
 
 class PatientHomeScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,20 +62,24 @@ class PatientHomeScreen : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DoctorAppointmentTheme {
-                val navController= rememberNavController()
+                val navController = rememberNavController()
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = Color(0xFFFFFFFF)
-                ){
+                ) {
                     PatientHome(navController)
                 }
-
             }
         }
     }
 }
+
 @Composable
-fun NavigationDrawerContent( userName: String, userPhotoUrl : String?,onItemClick: (String) -> Unit) {
+fun NavigationDrawerContent(
+    userName: String,
+    userPhotoUrl: String?,
+    onItemClick: (String) -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (userPhotoUrl != null) {
             AsyncImage(
@@ -123,85 +114,60 @@ fun NavigationDrawerContent( userName: String, userPhotoUrl : String?,onItemClic
         }
     }
 }
-@Composable
-fun PatientScreenHome() {
-    val navController = rememberNavController()
-    PatientHome(navController = navController)
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Welcome to the Patient Home Screen!")
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatientHome(navController: NavHostController) {
-
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     val user = Firebase.auth.currentUser
-    val userName = user?.displayName
+    val userName = user?.displayName ?: "Patient"
     val userPhotoUrl = user?.photoUrl?.toString()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            if (userName != null) {
-                NavigationDrawerContent(
-                    userName,userPhotoUrl,
-                    onItemClick = { label ->
-                        when (label) {
-                            "Edit Profile" -> { navController.navigate("edit_profile") }
-                            "Settings" -> { /* Navigate to Settings */ }
-                            "Feedback" -> { /* Navigate to Feedback */ }
-                            "Logout" -> {
-                                Firebase.auth.signOut()
-                                navController.navigate("login") {
-                                    popUpTo("patient_home") { inclusive = true }
-                                }
-                            }
+            NavigationDrawerContent(userName, userPhotoUrl) { label ->
+                when (label) {
+                    "Edit Profile" -> navController.navigate("edit_profile")
+                    "Logout" -> {
+                        Firebase.auth.signOut()
+                        navController.navigate("login") {
+                            popUpTo("patient_home") { inclusive = true }
                         }
                     }
-                )
+                }
             }
         }
     ) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Doctor Appointment") },
+
                     navigationIcon = {
                         IconButton(onClick = {
                             coroutineScope.launch { drawerState.open() }
                         }) {
                             Icon(Icons.Default.Menu, contentDescription = "Menu")
                         }
-                    }
+                    },
+                    title = { Text("Doctor Appointment") }
                 )
             },
             bottomBar = {
                 BottomNavigationBar(navController)
             }
         ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = "patient_home",
-                modifier = Modifier.padding(padding)
-            ) {
-                composable("patient_home") {
-                    PatientScreenHome()
-
-                }
-                composable("doc_home") { DoctorHome() }
-                composable("patient_appointments") { PatientAppointmentsScreen() }
-                composable("patient_view_doctors") { AllDoctorsScreen() }
-                composable("chatbot") { AIChatbotScreen() }
-                composable("edit_profile") { EditPatientProfileScreen(navController) }
-
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Welcome to the Patient Home Screen!",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
 }
-
 //    val firestore :FirebaseFirestore= Firebase.firestore
 //    var doctors by remember { mutableStateOf(listOf<DoctorDta>()) }
 //    var selectedSpeciality by remember { mutableStateOf("All") }
@@ -287,6 +253,7 @@ fun DropdownMenuBox(
         }
     }
 }
+
 @Composable
 fun DoctorCard(doctor: DoctorDta) {
     Card(
@@ -316,10 +283,10 @@ fun DoctorCard(doctor: DoctorDta) {
     }
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview() {
+// @Preview(showBackground = true)
+// @Composable
+// fun GreetingPreview() {
 //    DoctorAppointmentTheme {
 //        Greeting2("Android")
 //    }
-//}
+// }

@@ -20,12 +20,11 @@ class PatientViewModel : ViewModel() {
         email: String,
         profile: Uri?,
         address: String,
-        city : String,
-        state: String)
-    {
-
+        city: String,
+        state: String
+    ) {
         val patientid = auth.currentUser?.uid ?: return
-        val profileUrl = profile?.toString()?:""
+        val profileUrl = profile?.toString() ?: ""
         val patient = Patient(
             role = "patient",
             name = name,
