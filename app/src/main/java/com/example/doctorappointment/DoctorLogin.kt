@@ -90,7 +90,7 @@ fun DoctorLoginScreen(navController: NavController){
         Button(
             onClick = {
                 loading = true
-                auth.createUserWithEmailAndPassword(email, password)
+                auth.signInWithEmailAndPassword(email, password)
                     .addOnSuccessListener {
                         val uid = auth.currentUser!!.uid
                         db.collection("users").document(uid).get()
@@ -105,6 +105,10 @@ fun DoctorLoginScreen(navController: NavController){
                                     Toast.makeText(context, "Access Denied : Doctor", Toast.LENGTH_SHORT).show()
                                 }
                                 loading=false
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(context, "Error fetching user role", Toast.LENGTH_LONG).show()
+                                loading = false
                             }
 
 

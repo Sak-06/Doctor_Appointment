@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +31,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -52,6 +55,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
@@ -60,6 +64,10 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.launch
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import com.google.android.play.integrity.internal.c
+import com.google.android.play.integrity.internal.n
 
 class PatientHomeScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,37 +87,85 @@ class PatientHomeScreen : ComponentActivity() {
         }
     }
 }
+@Composable
+fun NavigationDrawerContent( userName: String, userPhotoUrl : String?,onItemClick: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        if (userPhotoUrl != null) {
+            AsyncImage(
+                model = userPhotoUrl,
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = "Default Profile",
+                modifier = Modifier.size(72.dp)
+            )
+        }
+        Text(
+            text = userName,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+        )
+
+        listOf("Edit Profile", "Settings", "Feedback", "Logout").forEach {
+            Text(
+                text = it,
+                fontSize = 18.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable { onItemClick(it) }
+            )
+        }
+    }
+}
+@Composable
+fun PatientScreenHome() {
+    val navController = rememberNavController()
+    PatientHome(navController = navController)
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Welcome to the Patient Home Screen!")
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PatientHome(navController: NavController,){
+fun PatientHome(navController: NavHostController) {
+
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
+    val user = Firebase.auth.currentUser
+    val userName = user?.displayName
+    val userPhotoUrl = user?.photoUrl?.toString()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            NavigationDrawerContent(
-                onItemClick = { label ->
-                    when (label) {
-                        "Edit Profile" -> { /* Navigate to Edit Profile */ }
-                        "Settings" -> { /* Navigate to Settings */ }
-                        "Feedback" -> { /* Navigate to Feedback */ }
-                        "Logout" -> {
-                            Firebase.auth.signOut()
-                            navController.navigate("login") {
-                                popUpTo("patient_home") { inclusive = true }
+            if (userName != null) {
+                NavigationDrawerContent(
+                    userName,userPhotoUrl,
+                    onItemClick = { label ->
+                        when (label) {
+                            "Edit Profile" -> { navController.navigate("edit_profile") }
+                            "Settings" -> { /* Navigate to Settings */ }
+                            "Feedback" -> { /* Navigate to Feedback */ }
+                            "Logout" -> {
+                                Firebase.auth.signOut()
+                                navController.navigate("login") {
+                                    popUpTo("patient_home") { inclusive = true }
+                                }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) {
         Scaffold(
-            bottomBar = {
-                BottomNavigationBar(navController)
-            },
             topBar = {
                 TopAppBar(
                     title = { Text("Doctor Appointment") },
@@ -121,6 +177,9 @@ fun PatientHome(navController: NavController,){
                         }
                     }
                 )
+            },
+            bottomBar = {
+                BottomNavigationBar(navController)
             }
         ) { padding ->
             NavHost(
@@ -128,14 +187,21 @@ fun PatientHome(navController: NavController,){
                 startDestination = "patient_home",
                 modifier = Modifier.padding(padding)
             ) {
-                composable("home") { DoctorHomeScreen() }
-                composable("appointments") { AppointmentsScreen() }
-                composable("doctors") { AllDoctorsScreen() }
+                composable("patient_home") {
+                    PatientScreenHome()
+
+                }
+                composable("doc_home") { DoctorHome() }
+                composable("patient_appointments") { PatientAppointmentsScreen() }
+                composable("patient_view_doctors") { AllDoctorsScreen() }
                 composable("chatbot") { AIChatbotScreen() }
+                composable("edit_profile") { EditPatientProfileScreen(navController) }
+
             }
         }
     }
 }
+
 //    val firestore :FirebaseFirestore= Firebase.firestore
 //    var doctors by remember { mutableStateOf(listOf<DoctorDta>()) }
 //    var selectedSpeciality by remember { mutableStateOf("All") }

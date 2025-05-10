@@ -3,7 +3,7 @@ package com.example.doctorappointment
 import android.net.Uri
 
 data class DoctorDta(
-
+val role: String ="doctor",
 val name: String = "",
 val profileUri : String ="",
 val specialty: String = "",

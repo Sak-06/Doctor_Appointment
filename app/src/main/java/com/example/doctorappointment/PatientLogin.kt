@@ -89,37 +89,44 @@ fun PatientLoginScreen(navController: NavController){
         )
         Button(
             onClick = {
+                if (email.isBlank() || password.isBlank()) {
+                    Toast.makeText(context, "Email and password cannot be empty", Toast.LENGTH_LONG).show()
+                }
+
                 loading = true
-                auth.createUserWithEmailAndPassword(email, password)
+                auth.signInWithEmailAndPassword(email.trim(), password)
                     .addOnSuccessListener {
                         val uid = auth.currentUser!!.uid
                         db.collection("users").document(uid).get()
                             .addOnSuccessListener { doc ->
-                                if(doc.getString("role")=="patient"){
+                                if (doc.getString("role") == "patient") {
                                     context.startActivity(Intent(context, PatientDashboard::class.java))
-                                }
-                                else{
+                                    navController.navigate("patient_home") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                } else {
                                     auth.signOut()
-                                    Toast.makeText(context, "Access Denied : Not a patient", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Access Denied: Not a patient", Toast.LENGTH_LONG).show()
                                 }
-                                loading=false
-                                navController.navigate("patient_home") {
-                                    popUpTo("login") { inclusive = true }
-                                }
+                                loading = false
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(context, "Error fetching user role", Toast.LENGTH_LONG).show()
+                                loading = false
                             }
                     }
                     .addOnFailureListener {
-                        Toast.makeText(context, " Login failed: ${it.message}", Toast.LENGTH_LONG).show()
-                        loading=false
+                        Toast.makeText(context, "Login failed: ${it.message}", Toast.LENGTH_LONG).show()
+                        loading = false
                     }
-
-
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
                 .padding(15.dp)
-                ){
-            Text(" Login ")
+        ) {
+            Text("Login")
         }
+
         if(loading){
             CircularProgressIndicator(modifier = Modifier.padding( top= 16.dp))
         }

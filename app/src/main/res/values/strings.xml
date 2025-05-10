@@ -7,4 +7,9 @@
     <string name="title_activity_registration">RegistrationActivity</string>
     <string name="title_activity_login">LoginActivity</string>
     <string name="title_activity_patient_home_screen">PatientHomeScreen</string>
+    <string name="title_activity_doctor_home_screen">DoctorHomeScreen</string>
+    <string name="title_activity_patient_appoitment">PatientAppoitment</string>
+    <string name="title_activity_patient_view_docs">PatientViewDocs</string>
+    <string name="title_activity_aichatbot">AIChatbot</string>
+    <string name="title_activity_edit_profile">EditProfileActivity</string>
 </resources>
