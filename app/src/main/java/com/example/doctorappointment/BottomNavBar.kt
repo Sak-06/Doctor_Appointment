@@ -1,5 +1,6 @@
 package com.example.doctorappointment
 
+import android.util.Log
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -36,17 +37,20 @@ fun BottomNavigationBar(navController: NavController) {
     NavigationBar {
         routes.forEachIndexed { index, route ->
             NavigationBarItem(
-                icon = { Icon(icons[index],
-                    contentDescription = labels[index],
-                    modifier = Modifier.size(30.dp),
-                    tint = Color.Unspecified
-                            )
-                       },
+                icon = {
+                    Icon(
+                        icons[index],
+                        contentDescription = labels[index],
+                        modifier = Modifier.size(35.dp),
+                        tint = Color.Unspecified
+                    )
+                },
                 label = { Text(labels[index]) },
                 selected = currentRoute == route,
                 onClick = {
                     if (currentRoute != route) {
                         navController.navigate(route) {
+                            // Simplified navigation logic: only pop up to startDestination if needed
                             popUpTo(navController.graph.startDestinationId) {
                                 saveState = true
                             }
@@ -55,7 +59,11 @@ fun BottomNavigationBar(navController: NavController) {
                         }
                     }
                 }
+
             )
         }
     }
+    Log.d("BottomNav", "Current route: $currentRoute, Routes: $routes")
+
 }
+

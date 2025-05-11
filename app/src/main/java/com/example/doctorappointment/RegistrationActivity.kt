@@ -1,8 +1,10 @@
 package com.example.doctorappointment
-
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -29,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +40,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -61,19 +68,25 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.PermissionState
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.shouldShowRationale
-
 
 
 class RegistrationActivity : AppCompatActivity() {
@@ -99,8 +112,10 @@ class RegistrationActivity : AppCompatActivity() {
                 }
             }
         }
+
     }
 }
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraPermissionRequest(onPermissionGranted: () -> Unit) {
@@ -238,14 +253,13 @@ fun DoctorRegistrationScreen(
     var specialty by remember { mutableStateOf("") }
     var experience by remember { mutableStateOf("") }
 
-    var addressline by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
+    var isMapOpen by remember { mutableStateOf(false) }
+    var geometry by remember { mutableStateOf<Geometry>(Geometry(0.0,0.0)) }
 
     var startTime by remember { mutableStateOf("") }
     var endTime by remember { mutableStateOf("") }
-    var date by remember{ mutableStateOf("") }
-    var availabilityMap by remember { mutableStateOf(mutableMapOf<String, MutableList<Pair<String, String>>>()) }
+    var date by remember { mutableStateOf("") }
+    var availabilityMap by remember { mutableStateOf(mutableMapOf<String, MutableList<TimeSlot>>()) }
     var profileImageUri by remember { mutableStateOf<Uri?>(null) }
 
     Column(
@@ -262,61 +276,96 @@ fun DoctorRegistrationScreen(
         }
 
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-        OutlinedTextField(value = specialty, onValueChange = { specialty = it }, label = { Text("Specialty") })
-        OutlinedTextField(value = experience, onValueChange = { experience = it }, label = { Text("Experience (years)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("Address Line") })
-        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
-        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
+        OutlinedTextField(
+            value = specialty,
+            onValueChange = { specialty = it },
+            label = { Text("Specialty") })
+        OutlinedTextField(
+            value = experience,
+            onValueChange = { experience = it },
+            label = { Text("Experience (years)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        )
+        Button(onClick = { isMapOpen =true
+            // Location is now saved in the `location` state
+        }) {
+            Text("Choose Location")
+        }
+        if(isMapOpen){
+            MapDialog(
+                onDismiss = { isMapOpen = false },
+                onLocationPicked = { lat, lon ,address->
+                    Toast.makeText(context, "Selected: $lat, $lon \n $address", Toast.LENGTH_LONG).show()
+
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@MapDialog
+                    geometry = Geometry(lat, lon)
+                    FirebaseFirestore.getInstance().collection("doctors")
+                        .document(uid)
+                        .update("geometry", geometry)
+                        .addOnSuccessListener {
+                            // Optionally: You can show a confirmation Toast
+                            Toast.makeText(context, "Location saved successfully", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { e ->
+                            // Handle failure to update Firestore
+                            Toast.makeText(context, "Error saving location: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    isMapOpen =false
+                }
+            )
+        }
 
         Button(onClick = {
-            val datePicker = MaterialDatePicker.Builder.datePicker().setTitleText("Select Date").build()
+            val datePicker =
+                MaterialDatePicker.Builder.datePicker().setTitleText("Select Date").build()
             datePicker.show((context as AppCompatActivity).supportFragmentManager, "datePicker")
             datePicker.addOnPositiveButtonClickListener { millis ->
-                val selectedDate = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(millis)
+                val selectedDate =
+                    SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(millis)
                 date = selectedDate
             }
         }) {
             Text("Pick Available Dates")
         }
-        if(date.isNotEmpty()){
+        if (date.isNotEmpty()) {
             Text("Selected Date: $date")
         }
-            Row {
-                Button(onClick = {
-                    showTimePicker(context) { time -> startTime = time }
-                }, modifier = Modifier.weight(1f)) {
-                    Text(if (startTime.isEmpty()) "Start Time" else startTime)
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Button(onClick = {
-                    showTimePicker(context) { time -> endTime = time }
-                }, modifier = Modifier.weight(1f)) {
-                    Text(if (endTime.isEmpty()) "End Time" else endTime)
-                }
+        Row {
+            Button(onClick = {
+                showTimePicker(context) { time -> startTime = time }
+            }, modifier = Modifier.weight(1f)) {
+                Text(if (startTime.isEmpty()) "Start Time" else startTime)
             }
+
+            Spacer(Modifier.width(8.dp))
 
             Button(onClick = {
-                if (startTime.isNotEmpty() && endTime.isNotEmpty() && date.isNotEmpty()) {
-                    val updatedSlots = availabilityMap[date]?.toMutableList()?: mutableListOf()
-                    updatedSlots.add(Pair(startTime, endTime))
-                    availabilityMap[date] = updatedSlots
-                    startTime = ""
-                    endTime = ""
-                }
-            }) {
-                Text("Add Time Slot")
+                showTimePicker(context) { time -> endTime = time }
+            }, modifier = Modifier.weight(1f)) {
+                Text(if (endTime.isEmpty()) "End Time" else endTime)
             }
+        }
+
+        Button(onClick = {
+            if (startTime.isNotEmpty() && endTime.isNotEmpty() && date.isNotEmpty()) {
+                val updatedSlots = availabilityMap[date]?.toMutableList() ?: mutableListOf()
+                updatedSlots.add(TimeSlot(startTime, endTime))
+                availabilityMap[date] = updatedSlots
+                startTime = ""
+                endTime = ""
+            }
+        }) {
+            Text("Add Time Slot")
+        }
         if (availabilityMap.containsKey(date)) {
             Text("Available Slots for $date:")
             availabilityMap[date]?.forEach { slot ->
-                Text("Slot: ${slot.first} - ${slot.second}")
+                Text("Slot: ${slot.startTime} - ${slot.endTime}")
             }
         }
 
-            Spacer(Modifier.height(8.dp))
-        }
+        Spacer(Modifier.height(8.dp))
+
 
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
         OutlinedTextField(
@@ -332,11 +381,7 @@ fun DoctorRegistrationScreen(
                     .addOnCompleteListener { task ->
                         if (task.isSuccessful) {
                             // Transform availability map to Firestore-friendly format
-                            val availabilityFirebase = availabilityMap.mapValues { entry ->
-                                entry.value.map { slot ->
-                                    mapOf("startTime" to slot.first, "endTime" to slot.second)
-                                }
-                            }
+                            val availabilityFirebase = availabilityMap
 
                             viewModel.registerDoctor(
                                 name = name,
@@ -344,9 +389,7 @@ fun DoctorRegistrationScreen(
                                 experience = experience.toIntOrNull() ?: 0,
                                 availability = availabilityFirebase,
                                 email = email,
-                                address = addressline,
-                                city = city,
-                                state = state,
+                                geometry = geometry,
                                 profile = profileImageUri
                             )
 
@@ -355,7 +398,11 @@ fun DoctorRegistrationScreen(
                             }
                             Toast.makeText(context, "Doctor Registered", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                "Error: ${task.exception?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
             } else {
@@ -365,6 +412,8 @@ fun DoctorRegistrationScreen(
             Text("Register Doctor")
         }
     }
+}
+
 
 
 @Composable
@@ -382,11 +431,9 @@ fun PatientRegistrationScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    var addressline by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
+    var geometry by remember { mutableStateOf<Geometry>(Geometry(0.0,0.0)) }
     var profileImageUri by remember { mutableStateOf<Uri?>(null) }
-
+    var isMapOpen by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -412,19 +459,44 @@ fun PatientRegistrationScreen(
         GenderSelector(gender) { selectedGender ->
             gender = selectedGender
         }
-
         OutlinedTextField(
             value = healthConditions,
             onValueChange = { healthConditions = it },
             label = { Text("Health Conditions") },
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(value = addressline, onValueChange = { addressline = it }, label = { Text("Address Line") })
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
-        Spacer(Modifier.height(8.dp))
+
+
+        Button(onClick = { isMapOpen =true
+            // Location is now saved in the `location` state
+        }) {
+            Text("Choose Location")
+        }
+
+        if(isMapOpen){
+            MapDialog(
+                onDismiss = { isMapOpen = false },
+                onLocationPicked = { lat, lon, address ->
+                    Toast.makeText(context, "Lat: $lat\nLon: $lon\n$address", Toast.LENGTH_LONG).show()
+                    // Save to Firestore here as Geometry(lat, lon)
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@MapDialog
+                    geometry.latitude = lat
+                    geometry.longitude=lon
+                    FirebaseFirestore.getInstance().collection("patients")
+                        .document(uid)
+                        .update("geometry", geometry)
+                        .addOnSuccessListener {
+                            // Optionally: You can show a confirmation Toast
+                            Toast.makeText(context, "Location saved successfully", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { e ->
+                            // Handle failure to update Firestore
+                            Toast.makeText(context, "Error saving location: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    isMapOpen = false
+                }
+            )
+        }
 
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
         Spacer(Modifier.height(8.dp))
@@ -447,9 +519,7 @@ fun PatientRegistrationScreen(
                                 gender = gender,
                                 healthConditions = healthConditions,
                                 email = email,
-                                address = addressline,
-                                city = city,
-                                state = state,
+                                geometry = geometry,
                                 profile = profileImageUri
                             )
                             navController.navigate("login") {
@@ -492,8 +562,23 @@ fun GenderSelector(selectedGender: String, onGenderSelected: (String) -> Unit) {
 
 @Composable
 fun RegistrationScreen(navController: NavController) {
-    var selectedRole by remember { mutableStateOf<String?>(null) }
+    var selectedRole by remember { mutableStateOf<String?>("Patient") }
 
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // Handle result if needed
+    }
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -501,7 +586,8 @@ fun RegistrationScreen(navController: NavController) {
         verticalArrangement = Arrangement.spacedBy(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Select Role", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(vertical = 50.dp))
+        Text("Register", fontWeight = FontWeight.Medium, fontSize = 30.sp, modifier = Modifier.padding(vertical = 30.dp))
+        Text("Select Role", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 40.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(
@@ -534,11 +620,79 @@ fun RegistrationScreen(navController: NavController) {
         }
     } 
 }
+@Composable
+fun MapDialog(
+    onDismiss: () -> Unit,
+    onLocationPicked: (Double, Double, String) -> Unit
+) {
+    val defaultLatLng = LatLng(20.5937, 78.9629) // Default location (India)
 
-// @Preview(showBackground = true)
-// @Composable
-// fun GreetingPreview6() {
-//    DoctorAppointmentTheme {
-//        RegistrationScreen()
-//    }
-// }
+    // Set up camera position state
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(defaultLatLng, 10f)
+    }
+
+    var selectedLatLng by remember { mutableStateOf<LatLng?>(null) }
+    var selectedAddress by remember { mutableStateOf<String>("") }
+
+    val context = LocalContext.current
+    // Function to handle reverse geocoding
+    fun reverseGeocode(latLng: LatLng) {
+        // Using the Geocoder to fetch the address for selected LatLng
+        val geocoder = Geocoder(context)
+        val addressList = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
+        selectedAddress = if (addressList?.isNotEmpty() == true) {
+            addressList[0]?.getAddressLine(0) ?: "Unknown Address"
+        } else {
+            "Unknown Address"
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pick Your Location") },
+        text = {
+            GoogleMap(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(isMyLocationEnabled = true),
+                uiSettings = MapUiSettings(zoomControlsEnabled = true),
+                onMapClick = { latLng ->
+                    selectedLatLng = latLng
+                    reverseGeocode(latLng) // Reverse geocode to get address
+                }
+            ) {
+                selectedLatLng?.let {
+                    Marker(
+                        state = MarkerState(position = LatLng(28.6139, 77.2090)),
+                        title = "Selected Location",
+                        snippet = "Lat: ${it.latitude}, Lng: ${it.longitude}"
+                    )
+                }
+            }
+
+            // Show selected address if available
+            if (selectedAddress.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Selected Address: $selectedAddress", style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+
+            TextButton(onClick = {
+                selectedLatLng?.let {
+                    onLocationPicked(it.latitude, it.longitude, selectedAddress)
+                }
+            }) {
+                Text("Confirm")
+            }
+        }
+    )
+}
+
+
+
+
+

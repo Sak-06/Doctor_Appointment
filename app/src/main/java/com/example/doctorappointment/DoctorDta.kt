@@ -5,15 +5,14 @@ data class DoctorDta(
     val role: String = "doctor",
     val name: String = "",
     val profileUri: String = "",
-    val specialty: String = "",
+    var specialty: String = "",
     val experience: Int = 0,
     val rating: Double = 0.0,
-    val address: String = "",
+    val geometry: Geometry=Geometry(0.0,0.0),
     val email: String = "",
-    val city: String = "",
-    val state: String = "",
     val availability: Map<String, List<TimeSlot>> = emptyMap()
 )
+
 
 data class TimeSlot(
     val startTime: String = "",

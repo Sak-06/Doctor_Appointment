@@ -33,6 +33,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class EditProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,11 +66,10 @@ fun EditPatientProfileScreen(
     var age by remember { mutableStateOf(patient?.age?.toString() ?: "") }
     var gender by remember { mutableStateOf(patient?.gender ?: "") }
     var healthConditions by remember { mutableStateOf(patient?.healthConditions ?: "") }
-    var address by remember { mutableStateOf(patient?.address ?: "") }
-    var city by remember { mutableStateOf(patient?.city ?: "") }
-    var state by remember { mutableStateOf(patient?.state ?: "") }
+    var geometry by remember { mutableStateOf(patient?.geometry?:Geometry(0.0,0.0)) }
     var profileUri by remember { mutableStateOf<Uri?>(patient?.profileUri?.let { Uri.parse(it) }) }
 
+    var isMapOpen by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.getPatientDetails()
     }
@@ -95,10 +96,27 @@ fun EditPatientProfileScreen(
         )
         GenderSelector(gender) { gender = it }
         OutlinedTextField(value = healthConditions, onValueChange = { healthConditions = it }, label = { Text("Health Conditions") })
-        OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address Line") })
-        OutlinedTextField(value = city, onValueChange = { city = it }, label = { Text("City") })
-        OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("State") })
+        Button(onClick = { isMapOpen =true
+            // Location is now saved in the `location` state
+        }) {
+            Text("Choose Location")
+        }
+        if(isMapOpen){
+            MapDialog(
+                onDismiss = { isMapOpen = false },
+                onLocationPicked = { lat, lon ,address->
+                    Toast.makeText(context, "Selected: $lat, $lon \n $address", Toast.LENGTH_LONG).show()
 
+                    // Optional: Save to Firestore here
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@MapDialog
+                    geometry = Geometry(lat, lon)
+                    FirebaseFirestore.getInstance().collection("patients")
+                        .document(uid)
+                        .update("geometry", geometry)
+                    isMapOpen = false
+                }
+            )
+        }
         Button(onClick = {
             if (name.isNotEmpty()) {
                 val updatedPatient = Patient(
@@ -106,9 +124,7 @@ fun EditPatientProfileScreen(
                     age = age.toIntOrNull() ?: 0,
                     gender = gender,
                     healthConditions = healthConditions,
-                    address = address,
-                    city = city,
-                    state = state,
+                    geometry = geometry,
                     profileUri = profileUri.toString(),
                     email = patient?.email ?: ""
                 )

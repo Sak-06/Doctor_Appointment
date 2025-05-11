@@ -30,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.rememberNavController
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
@@ -50,18 +52,19 @@ class PatientAppoitment : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatientAppointmentScreen() {
+    val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val patientId = auth.currentUser?.uid ?: ""
-    var appointments by remember { mutableStateOf(listOf<AppointmentDisplay>()) }
+    var appointments by remember { mutableStateOf(listOf<Appointment>()) }
 
     LaunchedEffect(Unit) {
         db.collection("appointments")
             .whereEqualTo("patientId", patientId)
             .get()
             .addOnSuccessListener { querySnapshot ->
-                val list = mutableListOf<AppointmentDisplay>()
+                val list = mutableListOf<Appointment>()
                 for (doc in querySnapshot.documents) {
                     val doctorId = doc.getString("doctorId") ?: continue
                     val appointmentTime =
@@ -72,10 +75,11 @@ fun PatientAppointmentScreen() {
                         .addOnSuccessListener { doctorDoc ->
                             val doctorName = doctorDoc.getString("name") ?: "Unknown Doctor"
                             list.add(
-                                AppointmentDisplay(
-                                    doctorName,
-                                    formattedTime,
-                                    doc.id
+                                Appointment(
+                                    doctorId,
+                                    patientId,
+                                    Timestamp(appointmentTime.time,0),
+                                    doc.getDouble("distance")?:0.0
                                 )
                             )
                             appointments = list.toList()
@@ -101,7 +105,11 @@ fun PatientAppointmentScreen() {
             TopAppBar(
                 title = { Text("My Appointments") }
             )
+        },
+        bottomBar = {
+            BottomNavigationBar(navController)
         }
+
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -118,7 +126,7 @@ fun PatientAppointmentScreen() {
 }
 
 @Composable
-fun AppointmentCard(appt: AppointmentDisplay) {
+fun AppointmentCard(appt: Appointment) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -126,16 +134,17 @@ fun AppointmentCard(appt: AppointmentDisplay) {
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Doctor: ${appt.doctorName}", style = MaterialTheme.typography.titleMedium)
+            Text("Doctor: ${appt.doctorId}", style = MaterialTheme.typography.titleMedium)
             Text("Time: ${SimpleDateFormat("hh:mm a, dd MMM yyyy", Locale.getDefault()).format(appt.appointmentTime)}")
         }
     }
 }
 
-data class AppointmentDisplay(
-    val doctorName: String,
-    val appointmentTime: String,
-    val appointmentId: String
+data class Appointment(
+    val doctorId: String = "",
+    val patientId: String = "",
+    val appointmentTime: Timestamp = Timestamp.now(),
+    val distance: Double = 0.0
 )
 
 fun scheduleAppointmentNotification(context: Context, triggerTimeMillis: Long, message: String) {

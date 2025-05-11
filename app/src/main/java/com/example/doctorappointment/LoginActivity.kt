@@ -1,5 +1,9 @@
 package com.example.doctorappointment
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import com.example.doctorappointment.ui.theme.DoctorAppointmentTheme
 
@@ -44,6 +49,22 @@ class LoginActivity : ComponentActivity() {
         }
     }
 }
+fun isLocationPermissionGranted(context: Context): Boolean {
+    return ActivityCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+fun requestLocationPermission(activity: Activity) {
+    ActivityCompat.requestPermissions(
+        activity,
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+        LOCATION_PERMISSION_REQUEST_CODE
+    )
+}
+
+const val LOCATION_PERMISSION_REQUEST_CODE = 1001
 
 @Composable
 fun LoginScreen(navController: NavController) {

@@ -1,11 +1,14 @@
 package com.example.doctorappointment
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.google.firebase.auth.FirebaseAuth
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph(navController: NavHostController) {
     NavHost(
@@ -23,7 +26,9 @@ fun AppNavGraph(navController: NavHostController) {
         composable("chatbot") { AIChatbotScreen() }
         composable("edit_profile") { EditPatientProfileScreen(navController) }
         composable("book_appointment/{doctorId}") { backStackEntry ->
-           val doctorId = backStackEntry.arguments?.getString("doctorId")
-            doctorId?.let{BookAppointmentScreen(doctorId = it, navController)} }
+            val doctorId = backStackEntry.arguments?.getString("doctorId")
+            doctorId?.let {
+                BookAppointmentDialog(doctorId = it, navController = navController, onDismissRequest = {navController.popBackStack()})
+            } }
     }
 }

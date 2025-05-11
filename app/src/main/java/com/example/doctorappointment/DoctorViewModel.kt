@@ -14,18 +14,16 @@ class DoctorViewModel : ViewModel() {
         name: String,
         specialty: String,
         experience: Int,
-        availability: Map<String, List<Map<String, String>>>,
+        availability: Map<String, List<TimeSlot>>,
         email: String,
         profile: Uri?,
-        address: String,
-        city: String,
-        state: String
+        geometry: Geometry
     ) {
         val docid = auth.currentUser?.uid ?: return
         val docAvailability = availability.mapValues { entry ->
             entry.value.map { slotmap ->
-                val start = slotmap["start"] ?: ""
-                val end = slotmap["end"] ?: ""
+                val start = slotmap.startTime ?: ""
+                val end = slotmap.endTime ?: ""
                 TimeSlot(start, end)
             }
         }
@@ -38,10 +36,8 @@ class DoctorViewModel : ViewModel() {
             experience = experience,
             profileUri = profileUrl,
             availability = docAvailability,
-            email = email,
-            address = address,
-            city = city,
-            state = state
+            geometry = geometry,
+            email = email
         )
 
         firestore.collection("doctors").document(docid)

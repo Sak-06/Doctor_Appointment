@@ -14,10 +14,11 @@ class AppointmentReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val appointmentTitle = intent.getStringExtra("title") ?: "Doctor Appointment"
-        val lat = intent.getDoubleExtra("lat", 0.0)
-        val lng = intent.getDoubleExtra("lng", 0.0)
-
-        val mapsUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+        val doctorLat = intent.getDoubleExtra("doctorLat", 0.0)
+        val doctorLng = intent.getDoubleExtra("doctorLng", 0.0)
+        val patientLat = intent.getDoubleExtra("patientLat", 0.0)
+        val patientLng = intent.getDoubleExtra("patientLng", 0.0)
+        val mapsUri = Uri.parse("https://www.google.com/maps/dir/?api=1&origin=$patientLat,$patientLng&destination=$doctorLat,$doctorLng")
         val mapsIntent = Intent(Intent.ACTION_VIEW, mapsUri)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -41,7 +42,7 @@ class AppointmentReminderReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, "appointment_channel")
             .setSmallIcon(R.drawable.notification)
             .setContentTitle("Appointment Reminder")
-            .setContentText("You have an appointment in 1 hour: $appointmentTitle")
+            .setContentText("You have an appointment in 1 hour: $appointmentTitle \n Tap to see directions")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
